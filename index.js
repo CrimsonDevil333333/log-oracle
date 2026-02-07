@@ -11,26 +11,32 @@ const program = new Command();
 program
   .name('log-oracle')
   .description('A CLI to distill "WTF" moments from logs.')
-  .version('1.0.0')
+  .version('1.1.0')
   .argument('[file]', 'Log file to analyze (or stdin)')
   .option('-s, --sensitivity <level>', 'Fuzzy match sensitivity (0.0 to 1.0)', '0.4')
   .option('-i, --ignore <pattern>', 'Add patterns to ignore (comma separated)')
+  .option('-j, --json', 'Output results as JSON')
+  .option('-w, --watch', 'Watch mode (keep running for live streams)')
   .action(async (file, options) => {
     const stream = file ? fs.createReadStream(file) : process.stdin;
     const rl = readline.createInterface({ input: stream, terminal: false });
 
-    // Chalk v4 fix: ensuring properties are accessed correctly
     const patterns = [
-      { regex: /error|fail|exception|fatal|critical/i, label: chalk.red('CRITICAL') },
-      { regex: /warn|issue|alert/i, label: chalk.yellow('WARNING') },
-      { regex: /denied|forbidden|unauthorized|403|401/i, label: chalk.magenta('SECURITY') },
-      { regex: /timeout|latency|slow|hang/i, label: chalk.cyan('PERF') }
+      { regex: /error|fail|exception|fatal|critical/i, label: chalk.red.bold('CRITICAL'), key: 'critical' },
+      { regex: /warn|issue|alert/i, label: chalk.yellow.bold('WARNING'), key: 'warning' },
+      { regex: /denied|forbidden|unauthorized|403|401/i, label: chalk.magenta.bold('SECURITY'), key: 'security' },
+      { regex: /timeout|latency|slow|hang/i, label: chalk.cyan.bold('PERF'), key: 'perf' }
     ];
 
     const ignoreList = options.ignore ? options.ignore.split(',') : ['info', 'debug', 'routine', 'heartbeat_ok'];
     const groupedErrors = new Map();
+    const stats = { total: 0, critical: 0, warning: 0, security: 0, perf: 0 };
 
-    console.log(chalk.blue('\n🔮 Log Oracle is meditating on your logs...\n'));
+    if (!options.json) {
+      console.log(chalk.blue.bold('\n🔮 Log Oracle is meditating on your logs...'));
+      if (options.watch) console.log(chalk.gray('   (Watching live input...)\n'));
+      else console.log('');
+    }
 
     for await (const line of rl) {
       const lowerLine = line.toLowerCase();
@@ -52,26 +58,41 @@ program
 
           if (!foundGroup) {
             groupedErrors.set(cleanLine, 1);
-            console.log(`${p.label} ${line.trim()}`);
+            if (!options.json) console.log(`${p.label} ${line.trim()}`);
           }
+          
+          stats.total++;
+          stats[p.key]++;
           break;
         }
       }
     }
 
-    console.log(chalk.blue('\n✨ Summary of "WTF" Moments:'));
-    if (groupedErrors.size === 0) {
-      console.log(chalk.green('   No issues found. Everything is zen.'));
+    if (options.json) {
+      const output = {
+        stats,
+        issues: Array.from(groupedErrors).map(([msg, count]) => ({ msg, count }))
+      };
+      console.log(JSON.stringify(output, null, 2));
     } else {
-      for (const [msg, count] of groupedErrors) {
-        if (count > 1) {
-          console.log(`   ${chalk.gray(`(Happened ${count}x)`)} ${msg}`);
-        } else {
-          console.log(`   ${msg}`);
+      console.log(chalk.blue.bold('\n📊 Log Oracle Statistics:'));
+      console.log(`   Total WTF Moments: ${stats.total}`);
+      console.log(`   - Critical: ${chalk.red(stats.critical)}`);
+      console.log(`   - Warnings: ${chalk.yellow(stats.warning)}`);
+      console.log(`   - Security: ${chalk.magenta(stats.security)}`);
+      console.log(`   - Performance: ${chalk.cyan(stats.perf)}`);
+
+      console.log(chalk.blue.bold('\n✨ Summary of Unique Grouped Issues:'));
+      if (groupedErrors.size === 0) {
+        console.log(chalk.green('   No issues found. Everything is zen.'));
+      } else {
+        for (const [msg, count] of groupedErrors) {
+          const countLabel = count > 1 ? chalk.gray(`(Happened ${count}x)`) : '';
+          console.log(`   ${countLabel} ${msg}`);
         }
       }
+      console.log('');
     }
-    console.log('');
   });
 
 program.parse();
