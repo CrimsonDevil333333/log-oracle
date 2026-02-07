@@ -19,28 +19,27 @@ program
     const stream = file ? fs.createReadStream(file) : process.stdin;
     const rl = readline.createInterface({ input: stream, terminal: false });
 
+    // Chalk v4 fix: ensuring properties are accessed correctly
     const patterns = [
-      { regex: /error|fail|exception|fatal|critical/i, label: chalk.red.bold('CRITICAL') },
-      { regex: /warn|issue|alert/i, label: chalk.yellow.bold('WARNING') },
-      { regex: /denied|forbidden|unauthorized|403|401/i, label: chalk.magenta.bold('SECURITY') },
-      { regex: /timeout|latency|slow|hang/i, label: chalk.cyan.bold('PERF') }
+      { regex: /error|fail|exception|fatal|critical/i, label: chalk.red('CRITICAL') },
+      { regex: /warn|issue|alert/i, label: chalk.yellow('WARNING') },
+      { regex: /denied|forbidden|unauthorized|403|401/i, label: chalk.magenta('SECURITY') },
+      { regex: /timeout|latency|slow|hang/i, label: chalk.cyan('PERF') }
     ];
 
     const ignoreList = options.ignore ? options.ignore.split(',') : ['info', 'debug', 'routine', 'heartbeat_ok'];
-    const logs = [];
     const groupedErrors = new Map();
 
-    console.log(chalk.blue.bold('\n🔮 Log Oracle is meditating on your logs...\n'));
+    console.log(chalk.blue('\n🔮 Log Oracle is meditating on your logs...\n'));
 
     for await (const line of rl) {
-      if (ignoreList.some(p => line.toLowerCase().includes(p.toLowerCase()))) continue;
+      const lowerLine = line.toLowerCase();
+      if (ignoreList.some(p => lowerLine.includes(p.toLowerCase()))) continue;
 
-      let matched = false;
       for (const p of patterns) {
         if (p.regex.test(line)) {
-          const cleanLine = line.replace(/\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}.*?\s/, '').trim();
+          const cleanLine = line.replace(/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}.*?\s/, '').trim();
           
-          // Basic fuzzy deduplication
           let foundGroup = false;
           for (const key of groupedErrors.keys()) {
             const fuse = new Fuse([key], { threshold: parseFloat(options.sensitivity) });
@@ -55,19 +54,20 @@ program
             groupedErrors.set(cleanLine, 1);
             console.log(`${p.label} ${line.trim()}`);
           }
-          matched = true;
           break;
         }
       }
     }
 
-    console.log(chalk.blue.bold('\n✨ Summary of "WTF" Moments:'));
+    console.log(chalk.blue('\n✨ Summary of "WTF" Moments:'));
     if (groupedErrors.size === 0) {
       console.log(chalk.green('   No issues found. Everything is zen.'));
     } else {
       for (const [msg, count] of groupedErrors) {
         if (count > 1) {
           console.log(`   ${chalk.gray(`(Happened ${count}x)`)} ${msg}`);
+        } else {
+          console.log(`   ${msg}`);
         }
       }
     }
