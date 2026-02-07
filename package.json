@@ -1,0 +1,18 @@
+{
+  "name": "log-oracle",
+  "version": "1.0.0",
+  "description": "Distill 'WTF' moments from logs using fuzzy deduplication.",
+  "main": "index.js",
+  "bin": {
+    "log-oracle": "./index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "fuse.js": "^7.0.0"
+  }
+}
